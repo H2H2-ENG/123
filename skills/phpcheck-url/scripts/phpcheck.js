@@ -3,12 +3,13 @@ const { execFileSync } = require('node:child_process')
 const { parseArgs } = require('node:util')
 
 const VERSION = '1.0.0'
-// Vulnerable version cutoffs as of 2026-10-20. A newer stable patch in a
-// listed branch is OK by this table; unlisted branches remain unknown.
-const VULNERABLE_THROUGH = {
-  '5.4': 45, '5.5': 38, '5.6': 40,
-  '7.0': 33, '7.1': 33, '7.2': 34, '7.3': 33, '7.4': 33,
-  '8.0': 30, '8.1': 34, '8.2': 34, '8.3': 35, '8.4': 26, '8.5': 11,
+// Fixed patch versions from the 2026-10-21 PHP advisory for CVE-2026-109618 and
+// CVE-2026-109619. null: no upstream fix (PHP 8.1 and older), so every version
+// in that branch is vulnerable; unlisted branches remain unknown.
+const FIXED_IN = {
+  '5.4': null, '5.5': null, '5.6': null,
+  '7.0': null, '7.1': null, '7.2': null, '7.3': null, '7.4': null,
+  '8.0': null, '8.1': null, '8.2': 35, '8.3': 36, '8.4': 27, '8.5': 12,
 }
 const USAGE = 'Usage: node phpcheck.js URL [--timeout SECONDS] [--json]\n' +
   '       node phpcheck.js --local [--php PATH] [--json]\n' +
@@ -17,10 +18,10 @@ const USAGE = 'Usage: node phpcheck.js URL [--timeout SECONDS] [--json]\n' +
 function patchStatus(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)([-+~].*)?$/.exec(version || '')
   if (!match) return 'unknown'
-  const cutoff = VULNERABLE_THROUGH[`${Number(match[1])}.${Number(match[2])}`]
-  if (cutoff === undefined) return 'unknown'
-  if (Number(match[3]) <= cutoff) return 'vulnerable'
-  // A development build of the next patch is not evidence of a stable fix.
+  const fixed = FIXED_IN[`${Number(match[1])}.${Number(match[2])}`]
+  if (fixed === undefined) return 'unknown'
+  if (fixed === null || Number(match[3]) < fixed) return 'vulnerable'
+  // A development build of the fixed patch is not evidence of a stable fix.
   if (/(?:^|[-+~.])(?:dev|alpha|beta|rc)/i.test(match[4] || '')) return 'unknown'
   return 'ok'
 }

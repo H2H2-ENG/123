@@ -55,19 +55,30 @@ for (const header of ['X-Powered-By', 'x-PoWeReD-bY', 'Server']) {
   }
 }
 
-test('each configured branch has an inclusive vulnerable boundary and a newer OK version', async t => {
+test('each fixed branch is vulnerable before its fixed version and OK from it', async t => {
   // Explicit fixtures: these assert the CLI contract without importing its classifier.
-  const boundaries = ['5.4.45', '5.5.38', '5.6.40', '7.0.33', '7.1.33', '7.2.34', '7.3.33', '7.4.33',
-    '8.0.30', '8.1.34', '8.2.34', '8.3.35', '8.4.26', '8.5.11']
+  const fixedVersions = ['8.2.35', '8.3.36', '8.4.27', '8.5.12']
   let header
   const url = await serve(t, (req, res) => { res.setHeader('X-Powered-By', header); res.end() })
-  for (const version of boundaries) {
-    header = `PHP/${version}`
-    check(await run([url, '--json']), 'vulnerable', version)
+  for (const version of fixedVersions) {
     const [major, minor, patch] = version.split('.').map(Number)
-    const newer = `${major}.${minor}.${patch + 1}`
-    header = `PHP/${newer}`
-    check(await run([url, '--json']), 'ok', newer)
+    const older = `${major}.${minor}.${patch - 1}`
+    header = `PHP/${older}`
+    check(await run([url, '--json']), 'vulnerable', older)
+    header = `PHP/${version}`
+    check(await run([url, '--json']), 'ok', version)
+  }
+})
+
+test('branches without an upstream fix are vulnerable at any patch version', async t => {
+  const branches = ['5.4', '5.5', '5.6', '7.0', '7.1', '7.2', '7.3', '7.4', '8.0', '8.1']
+  let header
+  const url = await serve(t, (req, res) => { res.setHeader('X-Powered-By', header); res.end() })
+  for (const branch of branches) {
+    for (const version of [`${branch}.0`, `${branch}.99`]) {
+      header = `PHP/${version}`
+      check(await run([url, '--json']), 'vulnerable', version)
+    }
   }
 })
 

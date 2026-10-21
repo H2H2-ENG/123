@@ -34,8 +34,8 @@ node phpcheck.js --local
 
 | Result | Exit code | Meaning |
 | --- | --- | --- |
-| `OK` | `0` | Stable PHP patch version above the embedded cutoff for a listed major/minor branch. |
-| `VULNERABLE` | `1` | PHP version at or below the embedded cutoff for that branch. |
+| `OK` | `0` | Stable PHP version at or above the fixed version for its branch: 8.2.35, 8.3.36, 8.4.27 or 8.5.12. |
+| `VULNERABLE` | `1` | PHP version below the fixed version for its branch, or any PHP 5.4 to 8.1 version (no upstream fix). |
 | `UNKNOWN` | `3` | No PHP version or response, an unrecognized version/branch, or a newer prerelease build. |
 
 Use `--json` for machine-readable output (`patch_status` is `ok`, `vulnerable`,
@@ -57,12 +57,13 @@ The checker only evaluates versions exposed in HTTP response headers or by
 `GET` only when `HEAD` returns 405 or 501. It does not follow redirects or
 inspect response bodies. Missing or hidden PHP headers return `UNKNOWN`.
 
-`OK` is a version comparison against the embedded October 20, 2026 cutoffs,
-assuming subsequent stable patches in each listed branch contain the fix;
-it does not independently verify a security fix. Check the cutoffs against
-the official PHP security release when its affected and fixed versions are
-published. Headers can be hidden or changed, and distribution backports may
-not change the upstream version. `UNKNOWN` does not mean the target is patched.
+`OK` is a version comparison against the fixed versions from the October 21,
+2026 [PHP security advisory](https://www.php.net/archive/2026.php#2026-10-21-5)
+for CVE-2026-109618 and CVE-2026-109619; it does not independently verify a
+security fix. PHP 8.1 and older get no upstream release, so the checker reports
+them as `VULNERABLE` even where a vendor or source backport fixes them.
+Headers can be hidden or changed, and distribution backports may not change the
+upstream version. `UNKNOWN` does not mean the target is patched.
 
 ## Contributing
 
