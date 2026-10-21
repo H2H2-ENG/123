@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const { spawn } = require('node:child_process')
 const { once } = require('node:events')
-const { cp, mkdtemp, rm } = require('node:fs/promises')
+const { cp, mkdtemp, rm, writeFile } = require('node:fs/promises')
 const http = require('node:http')
 const { tmpdir } = require('node:os')
 const path = require('node:path')
@@ -27,6 +27,14 @@ async function serve(t, handler) {
     server.closeAllConnections()
   }))
   return `http://127.0.0.1:${server.address().port}/`
+}
+
+async function fakePhp(t, output) {
+  const directory = await mkdtemp(path.join(tmpdir(), 'phpcheck-php-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const php = path.join(directory, 'php')
+  await writeFile(php, `#!/bin/sh\ncat <<'EOF'\n${output}\nEOF\n`, { mode: 0o755 })
+  return php
 }
 
 function check(result, status, version) {
@@ -166,4 +174,20 @@ test('the URL skill runs independently with its bundled checker', async t => {
   const result = await run([url, '--json'], path.join(directory, 'scripts/phpcheck.js'))
   check(result, 'ok', '8.4.27')
   assert.deepEqual(methods, ['HEAD'])
+})
+
+const banner = version => `PHP ${version} (cli) (built: Oct 21 2026 00:32:36) (NTS)\nCopyright (c) The PHP Group`
+
+for (const [version, status] of [['8.4.26', 'vulnerable'], ['8.4.27', 'ok'], ['8.4.27-1+ubuntu24.04.1+deb.sury.org+1', 'ok']]) {
+  test(`--local: php -v ${version} => ${status}`, async t => {
+    const php = await fakePhp(t, banner(version))
+    check(await run(['--local', '--php', php, '--json']), status, version)
+  })
+}
+
+test('--local ignores startup warnings printed before the php -v version', async t => {
+  const php = await fakePhp(t, `
+Warning: PHP Startup: Unable to load dynamic library 'redis' (tried: /usr/lib/php/20240924/redis.so (...)) in Unknown on line 0
+${banner('8.4.27')}`)
+  check(await run(['--local', '--php', php, '--json']), 'ok', '8.4.27')
 })
